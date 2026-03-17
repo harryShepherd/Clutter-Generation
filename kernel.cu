@@ -85,6 +85,28 @@ std::vector<float> ClutterPatchArea(
 	return patch_areas;
 }
 
+/// <summary>
+/// Calculate the look down angle for each range ring
+/// </summary>
+void LookDownAngle(
+	std::vector<float> isorange_rings,
+	float altitude,
+	float radius_of_earth,
+	int total_range_rings
+)
+{
+	for (int ring = 0; ring < total_range_rings - 1; ++ring)
+	{
+		float slant_range = (isorange_rings[ring] + isorange_rings[ring + 1]) / 2.0f;
+
+		float look_down_angle = (powf(slant_range, 2.0f) + powf(altitude + radius_of_earth, 2.0f) - powf(radius_of_earth, 2.0f)) / 
+			(2.0f * slant_range * (altitude + radius_of_earth));
+		
+		look_down_angle = asinf(look_down_angle);
+	}
+}
+
+
 int main()
 {
 	deviceInfo();
