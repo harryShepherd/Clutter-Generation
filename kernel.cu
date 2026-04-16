@@ -1,8 +1,7 @@
-﻿
+﻿#define _USE_MATH_DEFINES
+
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-
-#define _USE_MATH_DEFINES
 
 #include <stdio.h>
 #include <iostream>
@@ -13,9 +12,7 @@
 
 using namespace std;
 
-/// <summary>
-/// Prints out a summary of device information for all CUDA devices connected to the system.
-/// </summary>
+// Prints out a summary of device information for all CUDA devices connected to the system.
 void deviceInfo()
 {
 	int const kb = 1024;
@@ -44,11 +41,14 @@ void deviceInfo()
 
 		// the 0th grid dimension shows a weird number, seems like its overflowing. TODO: find out why
 		cout << "\tMax Grid Dimensions: [ " << deviceProperties.maxGridSize[0] << ", " << deviceProperties.maxGridSize[1] << ", " << deviceProperties.maxGridSize[2] << " ]" << endl;
+		cout << endl;
 	}
 }
 
+// Used for calculations
 int total_range_rings = 4;
 
+// Sinc Function
 float sinc(float x)
 {
 	if (x == 0.0f)
@@ -57,6 +57,7 @@ float sinc(float x)
 	return sinf(x) / x;
 }
 
+// Generates random float between 0 and 1
 float random_number_0_1()
 {
 	srand(time(NULL));
@@ -64,28 +65,22 @@ float random_number_0_1()
 	return rand() / RAND_MAX;
 }
 
-/// <summary>
-/// Simple antenna gain function using a sinc function.
-/// </summary>
+// Simple antenna gain function using sinc to roughly imitate boresight and sidelobes
 float AntennaGain(
-	float beam_width, // in rads
+	float beam_width,
 	float azimuth,
 	float elevation
 )
 {
-	float peak_gain = 1.0f / (beam_width * beam_width);
-
 	float az_sinc = sinc(azimuth);
 	float el_sinc = sinc(elevation);
 
-	float antenna_gain = peak_gain * az_sinc * az_sinc * el_sinc * el_sinc;
+	float antenna_gain = beam_width * az_sinc * az_sinc * el_sinc * el_sinc;
 
 	return antenna_gain;
 }
 
-/// <summary>
-/// Calculate the power received from a clutter patch.
-/// </summary>
+// Calculate the power received from a clutter patch.
 float CalculateClutterPower(
 	float transmitted_power,
 	float antenna_gain,
@@ -95,16 +90,15 @@ float CalculateClutterPower(
 	float signal_loss
 )
 {
-	float clutter_power = (transmitted_power * powf(antenna_gain, 2.0f) * clutter_cross_section * powf(wavelength, 2.0f)) /
+	// The general clutter power equation
+	float clutter_power = 
+		(transmitted_power * powf(antenna_gain, 2.0f) * clutter_cross_section * powf(wavelength, 2.0f)) /
 		(powf(4.0f * 3.14159265f , 3.0f) * powf(slant_range, 4.0f) * signal_loss);
 
 	return clutter_power;
 }
 
-
-/// <summary>
-/// Calculates the clutter patch areas
-/// </summary>
+// Calculates the clutter patch areas
 std::vector<float> ClutterPatchArea(
 	float altitude,
 	float radius_of_earth,
@@ -119,16 +113,14 @@ std::vector<float> ClutterPatchArea(
 	{
 		patch_areas[ring] = 
 			abs(0.5f * delta_azimuth * 
-			(powf(isorange_rings[ring], 2.0f) - (powf(isorange_rings[ring + 1], 2.0f))
-			* radius_of_earth) / (radius_of_earth + altitude));
+			(powf(isorange_rings[ring], 2.0f) - (powf(isorange_rings[ring + 1], 2.0f)) * 
+			radius_of_earth) / (radius_of_earth + altitude));
 
 	}
 	return patch_areas;
 }
 
-/// <summary>
-/// Calculate the grazing angle for each range ring
-/// </summary>
+// Calculate the grazing angle for each range ring
 std::vector<float> GrazingAngle(
 	std::vector<float> isorange_rings,
 	float altitude,
@@ -138,6 +130,7 @@ std::vector<float> GrazingAngle(
 {
 	std::vector<float> output(4);
 
+	// For every range ring
 	for (int ring = 0; ring < total_range_rings - 1; ++ring)
 	{
 		float slant_range = (isorange_rings[ring] + isorange_rings[ring + 1]) / 2.0f;
@@ -160,9 +153,7 @@ std::vector<float> GrazingAngle(
 	return output;
 }
 
-/// <summary>
-/// Calculate the look down angle for each range ring
-/// </summary>
+// Calculate the look down angle for each range ring
 std::vector<float> LookDownAngle(
 	std::vector<float> isorange_rings,
 	float altitude,
@@ -194,9 +185,7 @@ std::vector<float> LookDownAngle(
 	return output;
 }
 
-/// <summary>
-/// Returns a value that represents the clutter cross section.
-/// </summary>
+// Returns a value that represents the clutter cross section.
 float ClutterCrossSection(
 	float scattering_coefficient,
 	float grazing_angle
@@ -205,9 +194,7 @@ float ClutterCrossSection(
 	return scattering_coefficient * sinf(grazing_angle);
 }
 
-/// <summary>
-/// Returns power of clutter reflection using a probability density function
-/// </summary>
+// Returns power of clutter reflection using a probability density function
 float ClutterReflectivity(
 	float reflectivity,
 	float cross_section
@@ -216,21 +203,7 @@ float ClutterReflectivity(
 	return (1.0f / cross_section) * expf(-(reflectivity / cross_section));
 }
 
-/// <summary>
-/// Calculates the frequency returned by the clutter patch, taking into account doppler shift
-/// </summary>
-float SignalFrequency(
-	float azimuth,
-	float elevation,
-	float ownship_velocity,
-	float wavelength
-)
-{
-	float frequency = -(2.0f * ownship_velocity * cosf(azimuth) * cosf(elevation)) / wavelength;
-
-	return frequency;
-}
-
+// Calculates the relative amplitude of a returned signal
 float ClutterAmplitude(
 	float azimuth,
 	float elevation,
@@ -255,6 +228,20 @@ float ClutterAmplitude(
 	);
 }
 
+// Calculates the frequency returned by the clutter patch, taking into account doppler shift
+float Frequency(
+	float azimuth,
+	float elevation,
+	float ownship_velocity,
+	float wavelength
+)
+{
+	float frequency = -2.0f * ownship_velocity * cosf(azimuth) * cosf(elevation) / wavelength;
+
+	return frequency;
+}
+
+// Calculate the signal 
 std::complex<float> CalculateSignal(
 	int range_bin,
 	int pulse,
@@ -282,7 +269,7 @@ std::complex<float> CalculateSignal(
 	);
 
 	// Step 2: calculate doppler frequency
-	float doppler_frequency = SignalFrequency(
+	float doppler_frequency = Frequency(
 		azimuth,
 		elevation,
 		ownship_velocity,
@@ -305,24 +292,14 @@ int main()
 {
 	deviceInfo();
 
+	int prf_count = 10000;
+	int pulse_count = 10000;
 
-	float altitude = 5000.0f;
-	float radius_of_earth = 10.0f;
-	float delta_azimuth = 0.01000000f;
-	std::vector<float> isorange_rings = { 1.0f, 2.0f, 3.0f, 4.0f };
+	float transmitted_pulse_time = pulse_count * (1 / prf_count);
 
-	std::vector<float> output = ClutterPatchArea(altitude, radius_of_earth, delta_azimuth, 4, isorange_rings);
-	std::vector<float> output2 = LookDownAngle(isorange_rings, altitude, radius_of_earth, 4);
-
-	for (int i = 0; i < output.size(); i++)
+	for (int sample = 1; sample <= pulse_count; ++sample)
 	{
-		cout << output[i] << endl;
-	}
-
-	cout << endl;
-
-	for (int i = 0; i < output.size(); i++)
-	{
-		cout << output2[i] << endl;
+		// Signal is calculated here
+		// sampled at each range for the number of coherent pulsese transmitted at the PRF
 	}
 }
