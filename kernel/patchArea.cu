@@ -5,7 +5,7 @@ __global__ calculatePatchArea(
     float altitude,
 	float radius_of_earth,
 	float delta_azimuth,
-	int total_range_rings,
+	size_t total_range_rings,
 	float* isorange_rings_input
 	float* isorange_rings_output
 )
