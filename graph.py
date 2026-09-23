@@ -92,16 +92,8 @@ plt.figure(
     figsize=(10, 7)
 )
 
-plt.contour(
-    X,
-    Y,
-    power_db.T,
-    levels=levels,
-    linewidths=0.5
-)
 
-
-plt.imshow(power_db.T, aspect="auto", origin="lower")
+plt.imshow(power_db.T, aspect="auto", origin="upper")
 plt.xlabel("Range")
 plt.ylabel("Doppler")
 plt.show()
