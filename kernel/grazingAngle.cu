@@ -7,7 +7,7 @@ __global__ GrazingAngle(
     float radius_of_earth,
     size_t total_range_rings,
     float* isorange_rings_input,
-    float* isorange_rings_output
+    float* grazing_angles
 )
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -15,6 +15,13 @@ __global__ GrazingAngle(
     if(tid > total_range_rings) continue; // do not exceed vector limits
 
     float slant_range = (isorange_rings_input[tid] + isorange_rings_input[tid + 1]) / 2.0f;
+
+    if (slant_range < altitude)
+    {
+        // slant range can never be less than altitude
+        grazing_angles[tid] = NAN;
+        continue;
+    }
 
     float grazing_angle = 
         (pow(slant_range, 2) - pow(altitude + radius_of_earth, 2) + pow(radius_of_earth, 2)) /
@@ -26,8 +33,8 @@ __global__ GrazingAngle(
     }
     else
     {
-        grazing_angle = CUDART_PI_F / 2.0f;
+        grazing_angle = CUDART_PIO2_F;
     }
 
-    isorange_rings_output[tid] = grazing_angle;
+    grazing_angles[tid] = grazing_angle;
 }
