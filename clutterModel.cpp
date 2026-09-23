@@ -36,12 +36,12 @@ float AntennaGain(
 	float elevation
 )
 {
-	float az_sinc = sinc(azimuth);
-	float el_sinc = sinc(elevation);
+    float az_sinc = sinc(azimuth / beam_width);
+    float el_sinc = sinc(elevation / beam_width);
 
-	float antenna_gain = beam_width * az_sinc * az_sinc * el_sinc * el_sinc;
-
-	return antenna_gain;
+    float gain = powf(az_sinc, 2) * powf(el_sinc, 2);
+    
+    return gain;
 }
 
 // Calculate the power received from a clutter patch.
@@ -249,7 +249,7 @@ int main()
     const float wavelength = 0.03f;            // m
     const float PRF = 15000.0f;                // Hz
 
-    const float beam_width = 40.0f;
+    const float beam_width = 5.0f;             // degs
 
     const int coherent_pulses = 64;
     const int range_samples = 100;
