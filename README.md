@@ -3,6 +3,7 @@
 ### Visual Studio Setup
 
 1. Create a new, empty C++ project
+1. Title the project "_radarClutterCuda_"
 1. Create the solution folder inside the root directory
 1. Right-click the project, select Build Dependencies -> Build Customizations...
 1. Ensure CUDA is ticked
