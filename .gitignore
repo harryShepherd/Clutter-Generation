@@ -1,5 +1,2 @@
 .vs
-*.sln
-*.vcxproj*
-*.exe
-*.pdb
+radarClutterCuda
