@@ -1,8 +1,6 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include "maths_constants.h"
+#include "grazingAngle.cuh"
 
-__global__ GrazingAngle(
+__global__ void GrazingAngle(
     float altitude,
     float radius_of_earth,
     size_t total_range_rings,
@@ -12,19 +10,19 @@ __global__ GrazingAngle(
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     
-    if(tid > total_range_rings) continue; // do not exceed vector limits
+    if(tid > total_range_rings) return; // do not exceed vector limits
 
     float slant_range = (isorange_rings_input[tid] + isorange_rings_input[tid + 1]) / 2.0f;
 
     if (slant_range < altitude)
     {
         // slant range can never be less than altitude
-        grazing_angles[tid] = NAN;
-        continue;
+        grazing_angles[tid] = 0.0f;
+        return;
     }
 
     float grazing_angle = 
-        (pow(slant_range, 2) - pow(altitude + radius_of_earth, 2) + pow(radius_of_earth, 2)) /
+        (powf(slant_range, 2) - powf(altitude + radius_of_earth, 2) + powf(radius_of_earth, 2)) /
         (2.0f * slant_range * radius_of_earth);
     
     if (abs(grazing_angle) < 1)

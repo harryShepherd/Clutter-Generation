@@ -1,8 +1,6 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include "maths_constants.h"
+#include "lookDownAngle.cuh"
 
-__global__ LookDownAngle(
+__global__ void LookDownAngle(
     float altitude,
     float radius_of_earth,
     size_t total_range_rings,
@@ -12,19 +10,19 @@ __global__ LookDownAngle(
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     
-    if(tid > total_range_rings) continue; // do not exceed vector limits
+    if(tid > total_range_rings) return; // do not exceed vector limits
 
     float slant_range = (isorange_rings_inputs[tid] + isorange_rings_inputs[tid + 1]) / 2.0f;
 
     if (slant_range < altitude)
     {
         // slant range can never be less than altitude
-        look_down_angles[tid] = NAN;
-        continue;
+        look_down_angles[tid] = 0.0f;
+        return;
     }
 
     float look_down_angle = (
-        (pow(slant_range, 2) + pow(altitude + radius_of_earth, 2) - pow(radius_of_earth, 2)) /
+        (powf(slant_range, 2) + powf(altitude + radius_of_earth, 2) - powf(radius_of_earth, 2)) /
         (2.0f * slant_range * (altitude + radius_of_earth)));
 
     if (abs(look_down_angle) < 1)

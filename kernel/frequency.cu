@@ -1,14 +1,13 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include "frequency.cuh"
 
-__device__ inline float Frequency(
+__device__ float Frequency(
     const float az,
     const float el,
     const float vel,
     const float wavelength
 )
 {
-    float frequency = (-2.0f * ownship_velocity * cosf(az) * cosf(el)) / wavelength;
+    float frequency = (-2.0f * vel * cosf(az) * cosf(el)) / wavelength;
 
     return frequency;
 }

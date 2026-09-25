@@ -1,5 +1,4 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include "crossSection.cuh"
 
 __device__ inline float MeanClutterCrossSection(
 	float scattering_coefficient,
@@ -11,7 +10,7 @@ __device__ inline float MeanClutterCrossSection(
 
 __device__ inline float GenerateRandomSigma0(float mean_sigma0)
 {
-    float rand = 0.0f; // TODO: Implement CUDA RNG
+    float rand = 0.45f; // TODO: Implement CUDA RNG
 
     return -mean_sigma0 * logf(rand);
 }

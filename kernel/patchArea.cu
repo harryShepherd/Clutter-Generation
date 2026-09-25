@@ -1,18 +1,17 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include "patchArea.cuh"
 
-__global__ calculatePatchArea(
+__global__ void calculatePatchArea(
     float altitude,
 	float radius_of_earth,
 	float delta_azimuth,
 	size_t total_range_rings,
-	float* isorange_rings_input
+	float* isorange_rings_input,
 	float* isorange_rings_output
 )
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if(tid > total_range_rings) continue; // do not exceed vector limits
+    if(tid > total_range_rings - 1) return; // do not exceed vector limits
 
     float r1 = isorange_rings_input[tid];
     float r2 = isorange_rings_input[tid + 1];

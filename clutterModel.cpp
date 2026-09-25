@@ -1,3 +1,4 @@
+/*
 #define _USE_MATH_DEFINES
 
 #include <stdio.h>
@@ -240,7 +241,7 @@ std::complex<float> CalculateSignal(
 	return signal_c;
 }
 
-int main()
+int runGenerator()
 {
 
     // parameters
@@ -391,3 +392,4 @@ int main()
 
     std::cout << "Total signals: " << signals.size() << std::endl;
 }
+*/
