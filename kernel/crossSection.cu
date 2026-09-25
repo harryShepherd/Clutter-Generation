@@ -1,6 +1,6 @@
 #include "crossSection.cuh"
 
-__device__ inline float MeanClutterCrossSection(
+__device__ float MeanClutterCrossSection(
 	float scattering_coefficient,
 	float grazing_angle
 )
@@ -8,14 +8,14 @@ __device__ inline float MeanClutterCrossSection(
 	return scattering_coefficient * sinf(grazing_angle);
 }
 
-__device__ inline float GenerateRandomSigma0(float mean_sigma0)
+__device__ float GenerateRandomSigma0(float mean_sigma0)
 {
     float rand = 0.45f; // TODO: Implement CUDA RNG
 
     return -mean_sigma0 * logf(rand);
 }
 
-__device__ inline float ClutterCrossSection(
+__device__ float ClutterCrossSection(
     float gamma,
     float grazing_angle,
     float patch_area
