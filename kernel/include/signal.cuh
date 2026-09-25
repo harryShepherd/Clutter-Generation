@@ -6,17 +6,22 @@
 #include "math_constants.h"
 #include <cmath>
 
-__device__ cuDoubleComplex CalculateSignal(
-    const int range_bin,
-    const int pulse,
+__global__ void CalculateSignal(
+    const size_t total_range_rings,
+    const size_t total_azimuth_bins,
+    const size_t total_pulses,
+    const float azimuth_min,
+    const float delta_azimuth,
     const int prf,
-    const float az,
-    const float el,
     const float vel,
+    const float gamma,
+    const float beam_width,
     const float trans_power,
-    const float patch_power,
     const float wavelength,
-    const float slant_range,
     const float signal_loss,
-    const float phi_0
+    float* isorange_rings,
+    float* patch_areas,
+    float* look_down_angles,
+    float* grazing_angles,
+    cuFloatComplex* signal_output
 );
