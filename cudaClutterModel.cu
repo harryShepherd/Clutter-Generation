@@ -8,6 +8,8 @@
 #include <vector>
 #include <fstream>
 
+#include "curand.h"
+
 #include "antennaGain.cuh"
 #include "crossSection.cuh"
 #include "frequency.cuh"
@@ -53,8 +55,16 @@ int main()
     
     int total_isorange_rings = 200;
 
-    std::vector<float> isorange_rings(total_isorange_rings), patches(total_isorange_rings), grazing_angles(total_isorange_rings), look_down_angles(total_isorange_rings);
-    float* dev_isorange_rings, * dev_patches, * dev_grazing_angles, * dev_look_down_angles;
+    std::vector<float> isorange_rings(total_isorange_rings),
+        patches(total_isorange_rings),
+        grazing_angles(total_isorange_rings),
+        look_down_angles(total_isorange_rings);
+
+    float *dev_isorange_rings,
+        *dev_patches,
+        *dev_grazing_angles,
+        *dev_look_down_angles,
+        *dev_random_numbers;
 
     for (int i = 0; i < total_isorange_rings; ++i)
     {
@@ -75,6 +85,7 @@ int main()
     cudaErrChk(cudaMalloc(&dev_grazing_angles, total_isorange_rings * sizeof(float)));
     cudaErrChk(cudaMalloc(&dev_look_down_angles, total_isorange_rings * sizeof(float)));
     cudaErrChk(cudaMalloc(&dev_signals, total_signals * sizeof(cuFloatComplex)));
+    cudaErrChk(cudaMalloc(&dev_random_numbers, total_signals * sizeof(float)));
 
     // copy isorange rings to device
     cudaErrChk(cudaMemcpy(dev_isorange_rings, isorange_rings.data(), total_isorange_rings * sizeof(float), cudaMemcpyHostToDevice));
@@ -91,6 +102,13 @@ int main()
     // calculate look down angles
     LookDownAngle<<<blocks, threads>>>(altitude, radius_of_earth, total_isorange_rings, dev_isorange_rings, dev_look_down_angles);
 
+    curandGenerator_t gen;
+    unsigned long long seed = 1;
+
+    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+    curandSetPseudoRandomGeneratorSeed(gen, seed);
+    curandGenerateUniform(gen, dev_random_numbers, total_signals);
+        
     // calculate how many signals we need to generate
     blocks = std::ceilf(static_cast<float>(total_signals) / static_cast<float>(threads));
 
@@ -111,10 +129,11 @@ int main()
         dev_patches,
         dev_look_down_angles,
         dev_grazing_angles,
+        dev_random_numbers,
         dev_signals);
 
     cudaErrChk(cudaPeekAtLastError());
-    //cudaErrChk(cudaDeviceSynchronize());
+    cudaErrChk(cudaDeviceSynchronize());
 
     cudaErrChk(cudaMemcpy(signals.data(), dev_signals, total_signals * sizeof(cuFloatComplex), cudaMemcpyDeviceToHost));
 

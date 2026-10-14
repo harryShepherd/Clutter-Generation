@@ -23,5 +23,6 @@ __global__ void CalculateSignal(
     float* patch_areas,
     float* look_down_angles,
     float* grazing_angles,
+    float* random_numbers,
     cuFloatComplex* signal_output
 );

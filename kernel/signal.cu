@@ -23,6 +23,7 @@ __global__ void CalculateSignal(
     float* patch_areas,
     float* look_down_angles,
     float* grazing_angles,
+    float* random_numbers,
     cuFloatComplex* signal_output
 )
 {
@@ -59,7 +60,7 @@ __global__ void CalculateSignal(
         signal_loss
     );
 
-    float phi_0 = 0.5f; // TODO: make this random
+    float phi_0 = random_numbers[tid]; 
 
     float amplitude = sqrtf(patch_power);
 
