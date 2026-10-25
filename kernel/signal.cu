@@ -3,82 +3,93 @@
 #include "crossSection.cuh"
 #include "antennaGain.cuh"
 #include "patchPower.cuh"
+#include "patchArea.cuh"
+#include "grazingAngle.cuh"
+#include "lookDownAngle.cuh"
 
-#include <cstdio>
+#include <curand_kernel.h>
 
-__global__ void CalculateSignal(
-    const size_t total_range_rings,
-    const size_t total_azimuth_bins,
-    const size_t total_pulses,
-    const float azimuth_min,
+__global__ void patchSetup(
+    const int total_range_rings,
+    const int total_azimuth_bins,
+    const float prf,
     const float delta_azimuth,
-    const int prf,
-    const float vel,
-    const float gamma,
+    const float radius_of_earth,
+    const float altitude,
+    const float velocity,
     const float beam_width,
-    const float trans_power,
+    const float transmitted_power,
     const float wavelength,
     const float signal_loss,
-    float* isorange_rings,
-    float* patch_areas,
-    float* look_down_angles,
-    float* grazing_angles,
-    float* random_numbers,
-    cuFloatComplex* signal_output
-)
+    const float azimuth_min,
+    const float gamma,
+    const unsigned long long rand_seed,
+    const float* isorange_rings_in,
+    patchParams* __restrict__ out)
 {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (tid >= (total_range_rings - 1) * total_azimuth_bins * total_pulses) return;
+    if (tid >= total_range_rings * total_azimuth_bins) return;
 
-    int current_pulse = tid % total_pulses;
-    int current_az_bin = (tid / total_pulses) % total_azimuth_bins;
-    int current_range_ring = (tid / total_pulses) / total_azimuth_bins;
+    // find out with range ring and azimuth bin we're working on
+    int range_ring = tid / total_azimuth_bins;
+    int azimuth_bin = tid % total_azimuth_bins;
+
+    float ring1 = isorange_rings_in[tid];
+    float ring2 = isorange_rings_in[tid + 1];
+    float slant_range = (ring1 + ring2) / 2.0f;
 
     // get some information about the patch we're working on
-    float patch_area = patch_areas[current_range_ring];
-    float patch_look_down_angle = look_down_angles[current_range_ring];
-    float patch_grazing_angle = grazing_angles[current_range_ring];
-    float patch_azimuth = (azimuth_min + (delta_azimuth * current_az_bin)) + (delta_azimuth / 2.0f);
+    float patch_area = patchArea(ring1, ring2, altitude, radius_of_earth, delta_azimuth);
+    float patch_grazing_angle = grazingAngle(altitude, radius_of_earth, slant_range);
+    float patch_look_down_angle = lookDownAngle(altitude, radius_of_earth, slant_range);
+    float patch_azimuth = (azimuth_min + (delta_azimuth * azimuth_bin)) + (delta_azimuth / 2.0f);
 
-    // calculate slant range
-    float slant_range = (isorange_rings[current_range_ring] + isorange_rings[current_range_ring + 1]) / 2.0f;
+    // random number generation
+    curandStatePhilox4_32_10_t state;
+    curand_init(rand_seed, tid, 0, &state);
+    double2 rand = curand_uniform2_double(&state); // rand.x -> sigma_0, rand.y -> phi_0
 
-    // calculate cross section
-    float cross_section = ClutterCrossSection(gamma, patch_grazing_angle, patch_area);
+    float patch_cross_section = crossSection(gamma, patch_grazing_angle, patch_area, rand.x);
+    float antenna_gain = antennaGain(beam_width, patch_azimuth, patch_look_down_angle);
 
-    // calculate antenna gain
-    float antenna_gain = AntennaGain(beam_width, patch_azimuth, patch_look_down_angle);
-    
-    // calculate the power returned by the clutter patch
-    float patch_power = patchPower(
-        trans_power,
-        antenna_gain,
-        cross_section,
-        wavelength,
-        slant_range,
-        signal_loss
-    );
+    float patch_power = patchPower(transmitted_power, antenna_gain,  patch_cross_section, wavelength, slant_range, signal_loss);
 
-    float phi_0 = random_numbers[tid]; 
+    float doppler_frequency = Frequency(patch_azimuth, patch_look_down_angle, velocity, wavelength);
 
-    float amplitude = sqrtf(patch_power);
+    // create patch parameters
+    patchParams params{
+        sqrtf(patch_power),         // amplitude
+        doppler_frequency / prf,    // doppler frequency per cycle
+        rand.y                      // phi_0
+    };
 
-    float doppler_frequency = Frequency(
-        patch_azimuth,
-        patch_look_down_angle,
-        vel,
-        wavelength
-    );
+    out[tid] = params;
+}
 
-    float transmitted_pulse_time = current_pulse * (1.0f / (float)prf);
+__global__ void pulseSamples(
+    const patchParams* __restrict__ patch_params,
+    const int total_pulses,
+    cuFloatComplex* out)
+{
+    // read-only
+    const patchParams patch = patch_params[blockIdx.x];
 
-    float x = 2.0f * CUDART_PI_F * doppler_frequency * transmitted_pulse_time + phi_0;
+    cuFloatComplex* c = out + static_cast<size_t>(blockIdx.x) * total_pulses;
 
-    float sinx = sinf(x);
-    float cosx = cosf(x);
+    for (int pulse = threadIdx.x; pulse < total_pulses; pulse += blockDim.x)
+    {
+        // fmaf computes (x * y) + z in one instruction
+        // this was previously written as:
+        //      2.0f * CUDART_PI_F * doppler_frequency * transmitted_pulse_time + phi_0
+        // we are doing the same, except having removed 2pi
+        float cycle = fmaf(patch.doppler_frequency, pulse, patch.random_phase);
+        cycle -= floorf(cycle);
 
-    cuFloatComplex c = make_cuFloatComplex(amplitude * cosx, -amplitude * sinx);
+        float s, c;
+        // 2.0f * cycle is where we re-add 2pi from the previous equation
+        sincospif(2.0f * cycle, &s, &c);
 
-    signal_output[tid] = c;
+        out[pulse] = make_cuFloatComplex(patch.amplitude * c, -patch.amplitude * s);
+    }
 }

@@ -6,23 +6,34 @@
 #include "math_constants.h"
 #include <cmath>
 
-__global__ void CalculateSignal(
-    const size_t total_range_rings,
-    const size_t total_azimuth_bins,
-    const size_t total_pulses,
-    const float azimuth_min,
+// Parameters of each patch that remain unchanged between pulses
+struct patchParams
+{
+    float amplitude;            // sqrt of the power
+    float doppler_frequency;    //
+    float random_phase;         // phi_0
+};
+
+// Calculate patch-specific values. Writes out to a patchParams array
+__global__ void patchSetup(
+    const int total_range_rings,
+    const int total_azimuth_bins,
+    const float prf,
     const float delta_azimuth,
-    const int prf,
-    const float vel,
-    const float gamma,
+    const float radius_of_earth,
+    const float altitude,
+    const float velocity,
     const float beam_width,
-    const float trans_power,
+    const float transmitted_power,
     const float wavelength,
     const float signal_loss,
-    float* isorange_rings,
-    float* patch_areas,
-    float* look_down_angles,
-    float* grazing_angles,
-    float* random_numbers,
-    cuFloatComplex* signal_output
-);
+    const float azimuth_min,
+    const float gamma,
+    const unsigned long long rand_seed,
+    const float* isorange_rings_in,
+    patchParams* __restrict__ out);
+
+__global__ void pulseSamples(
+    const patchParams* __restrict__ patch_params,
+    const int total_pulses,
+    cuFloatComplex* out);

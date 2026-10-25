@@ -6,10 +6,26 @@
 
 #include <math.h>
 
-__global__ void GrazingAngle(
-    float altitude,
-    float radius_of_earth,
-    size_t total_range_rings,
-    float* isorange_rings,
-    float* grazing_angle
-);
+__device__ __inline__ float grazingAngle(
+    const float altitude,
+    const float radius_of_earth,
+    const float slant_range
+)
+{
+    if (slant_range < altitude)
+    {
+        // slant range can never be less than altitude
+        return 0.0f;
+    }
+
+    float grazing_angle =
+        (powf(slant_range, 2) - powf(altitude + radius_of_earth, 2) + powf(radius_of_earth, 2)) /
+        (2.0f * slant_range * radius_of_earth);
+
+    if (fabsf(grazing_angle) < 1)
+    {
+        return grazing_angle = -(asin(grazing_angle));
+    }
+
+    return CUDART_PIO2_F;
+}
