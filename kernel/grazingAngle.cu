@@ -36,3 +36,39 @@ __global__ void GrazingAngle(
 
     grazing_angles[tid] = grazing_angle;
 }
+
+__device__ void sm_grazingAngle(
+    const float altitude,
+    const float radius_of_earth,
+    const size_t total_range_rings,
+    float* isorange_rings_input,
+    float* grazing_angle_output
+)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid > total_range_rings) return;
+
+    float slant_range = (isorange_rings_input[tid] + isorange_rings_input[tid + 1]) / 2.0f;
+
+    if (slant_range < altitude)
+    {
+        // slant range can never be less than altitude
+        grazing_angle_output[tid] = 0.0f;
+        return;
+    }
+
+    float grazing_angle =
+        (powf(slant_range, 2) - powf(altitude + radius_of_earth, 2) + powf(radius_of_earth, 2)) /
+        (2.0f * slant_range * radius_of_earth);
+
+    if (abs(grazing_angle) < 1)
+    {
+        grazing_angle = -(asin(grazing_angle));
+    }
+    else
+    {
+        grazing_angle = CUDART_PIO2_F;
+    }
+
+    grazing_angle_output[tid] = grazing_angle;
+}

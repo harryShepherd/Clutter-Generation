@@ -11,3 +11,11 @@ __global__ void LookDownAngle(
     float* isorange_rings_inputs,
     float* look_down_angles
 );
+
+__device__ void sm_lookDownAngle(
+    const float altitude,
+    const float radius_of_earth,
+    const size_t total_range_rings,
+    float* isorange_rings_input,
+    float* look_down_angles_output
+);

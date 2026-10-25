@@ -26,3 +26,23 @@ __global__ void CalculateSignal(
     float* random_numbers,
     cuFloatComplex* signal_output
 );
+
+__global__ void CalculateSignalSharedMem(
+    const size_t total_range_rings,
+    const size_t total_azimuth_bins,
+    const size_t total_pulses,
+    const float altitude,
+    const float radius_of_earth,
+    const float azimuth_min,
+    const float delta_azimuth,
+    const float range_sample_spacing,
+    const int prf,
+    const float vel,
+    const float gamma,
+    const float beam_width,
+    const float trans_power,
+    const float wavelength,
+    const float signal_loss,
+    float* random_numbers,
+    cuFloatComplex* signal_output
+);

@@ -13,3 +13,11 @@ __global__ void GrazingAngle(
     float* isorange_rings,
     float* grazing_angle
 );
+
+__device__ void sm_grazingAngle(
+    const float altitude,
+    const float radius_of_earth,
+    const size_t total_range_rings,
+    float* isorange_rings_input,
+    float* grazing_angle_output
+);
