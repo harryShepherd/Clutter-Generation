@@ -94,43 +94,65 @@ int main()
     size_t threads = 124;
     size_t blocks = std::ceilf(static_cast<float>(total_isorange_rings) / static_cast<float>(threads));
 
-    calculatePatchArea<<<blocks, threads>>>(altitude, radius_of_earth, delta_azimuth, total_isorange_rings, dev_isorange_rings, dev_patches);
+    auto generate = [&]()
+        {
+            calculatePatchArea << <blocks, threads >> > (altitude, radius_of_earth, delta_azimuth, total_isorange_rings, dev_isorange_rings, dev_patches);
 
-    // calculate grazing angles
-    GrazingAngle<<<blocks, threads>>>(altitude, radius_of_earth, total_isorange_rings, dev_isorange_rings, dev_grazing_angles);
+            // calculate grazing angles
+            GrazingAngle << <blocks, threads >> > (altitude, radius_of_earth, total_isorange_rings, dev_isorange_rings, dev_grazing_angles);
 
-    // calculate look down angles
-    LookDownAngle<<<blocks, threads>>>(altitude, radius_of_earth, total_isorange_rings, dev_isorange_rings, dev_look_down_angles);
+            // calculate look down angles
+            LookDownAngle << <blocks, threads >> > (altitude, radius_of_earth, total_isorange_rings, dev_isorange_rings, dev_look_down_angles);
 
-    curandGenerator_t gen;
-    unsigned long long seed = 1;
+            curandGenerator_t gen;
+            unsigned long long seed = 1;
 
-    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-    curandSetPseudoRandomGeneratorSeed(gen, seed);
-    curandGenerateUniform(gen, dev_random_numbers, total_signals);
-        
-    // calculate how many signals we need to generate
-    blocks = std::ceilf(static_cast<float>(total_signals) / static_cast<float>(threads));
+            curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+            curandSetPseudoRandomGeneratorSeed(gen, seed);
+            curandGenerateUniform(gen, dev_random_numbers, total_signals);
 
-    CalculateSignal<<<blocks, threads>>>(
-        total_isorange_rings,
-        total_az_patches,
-        coherent_pulses,
-        azimuth_min,
-        delta_azimuth,
-        PRF,
-        ownship_velocity,
-        gamma,
-        beam_width,
-        transmitted_power,
-        wavelength,
-        signal_loss,
-        dev_isorange_rings,
-        dev_patches,
-        dev_look_down_angles,
-        dev_grazing_angles,
-        dev_random_numbers,
-        dev_signals);
+            // calculate how many signals we need to generate
+            blocks = std::ceilf(static_cast<float>(total_signals) / static_cast<float>(threads));
+
+            CalculateSignal << <blocks, threads >> > (
+                total_isorange_rings,
+                total_az_patches,
+                coherent_pulses,
+                azimuth_min,
+                delta_azimuth,
+                PRF,
+                ownship_velocity,
+                gamma,
+                beam_width,
+                transmitted_power,
+                wavelength,
+                signal_loss,
+                dev_isorange_rings,
+                dev_patches,
+                dev_look_down_angles,
+                dev_grazing_angles,
+                dev_random_numbers,
+                dev_signals);
+        };
+
+    // warm-up
+    generate();
+
+
+    cudaEvent_t start, stop;
+    cudaErrChk(cudaEventCreate(&start));
+    cudaErrChk(cudaEventCreate(&stop));
+
+    cudaErrChk(cudaEventRecord(start));
+    generate();
+    cudaErrChk(cudaEventRecord(stop));
+    cudaErrChk(cudaPeekAtLastError());
+    cudaErrChk(cudaEventSynchronize(stop));
+
+    float kernel_ms = 0.0f;
+    cudaErrChk(cudaEventElapsedTime(&kernel_ms, start, stop));
+
+    std::cout << "Took " << kernel_ms << "ms" << std::endl;
 
     cudaErrChk(cudaPeekAtLastError());
     cudaErrChk(cudaDeviceSynchronize());
