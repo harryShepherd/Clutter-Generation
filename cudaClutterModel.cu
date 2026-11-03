@@ -151,7 +151,7 @@ int main()
     auto copy_stop = std::chrono::steady_clock::now();
 
     std::chrono::duration<double, std::milli> copy_ms = copy_stop - copy_start;
-
+    std::cout << copy_ms.count() << "ms" << std::endl;
 
     std::cout << "Writing to file" << std::endl;
 
